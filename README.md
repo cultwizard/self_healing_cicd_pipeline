@@ -52,3 +52,7 @@ Fill in `.env` with:
 1. Push the initial working baseline to `main` (CI turns green).
 2. Break `demo_app/app.py` (e.g., change `a / b` to `a / 0`) and push to `main`.
 3. Watch `deploy.yml` fail -> Orchestrator roll back `main` -> CI re-run green on the restored commit -> GitHub Issue open with the AI fix -> Dashboard update with full incident details.
+
+## Render Url: 
+https://self-healing-cicd-pipeline-0q30.onrender.com/
+https://self-healing-cicd-proto.onrender.com/health
