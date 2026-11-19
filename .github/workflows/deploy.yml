@@ -1,0 +1,49 @@
+name: CI/CD Deploy & Health Check
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Test Dependencies
+        run: pip install fastapi httpx pytest
+
+      - name: Run Verification Tests
+        id: verify
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python -m pytest demo_app/test_app.py 2>&1 | tee ci_logs.txt
+
+      - name: Trigger Self-Healing Orchestrator on Failure
+        if: failure() && !contains(github.event.head_commit.message, '[skip-heal]')
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          PREV_SHA=$(git rev-parse --verify HEAD~1 2>/dev/null || echo "")
+          LOGS=$(tail -n 80 ci_logs.txt)
+          PAYLOAD=$(jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "main" \
+            --arg sha "$GITHUB_SHA" \
+            --arg prev "$PREV_SHA" \
+            --arg logs "$LOGS" \
+            '{repo: $repo, branch: $branch, commit_sha: $sha, previous_good_sha: $prev, failure_stage: "pytest_verify", runtime_logs: $logs}')
+
+          curl -sS --fail-with-body -X POST "$ORCHESTRATOR_URL/webhook/failure" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: $WEBHOOK_SECRET" \
+            -d "$PAYLOAD"
