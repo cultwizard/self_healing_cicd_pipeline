@@ -10,4 +10,4 @@ def health():
 
 @app.get("/calculate")
 def calculate(a: int, b: int):
-    return {"result": a / 0}
+    return {"result": a / b}
